@@ -1,0 +1,5 @@
+#!/usr/bin/env ruby
+
+require_relative '../lib/mac_cleaner'
+
+MacCleaner::CLI.start(ARGV)
