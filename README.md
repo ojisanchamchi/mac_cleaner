@@ -1,5 +1,9 @@
 # Mac Cleaner
 
+[![Gem Version](https://badge.fury.io/rb/mac_cleaner.svg)](https://badge.fury.io/rb/mac_cleaner)
+
+[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/ojisanchamchi)
+
 A script to clean your Mac and analyze disk space.
 
 ## Installation
