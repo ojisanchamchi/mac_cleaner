@@ -2,14 +2,27 @@ require 'fileutils'
 
 module MacCleaner
   class Cleaner
-    def initialize(dry_run: false, sudo: false)
+    def initialize(dry_run: false, sudo: false, interactive: false, input: $stdin)
       @dry_run = dry_run
       @sudo = sudo
+      @interactive = interactive
+      @input = input
       @total_size_cleaned = 0
     end
 
     def clean
-      CLEANUP_SECTIONS.each do |section|
+      sections = if @interactive
+                   interactive_section_selection(CLEANUP_SECTIONS)
+                 else
+                   CLEANUP_SECTIONS
+                 end
+
+      if sections.empty?
+        puts "\nNo sections selected. Exiting."
+        return
+      end
+
+      sections.each do |section|
         if section[:sudo] && !@sudo
           puts "\nSkipping '#{section[:name]}' (requires sudo)"
           next
@@ -31,27 +44,69 @@ module MacCleaner
         return
       end
 
-      paths = begin
-        Dir.glob(File.expand_path(target[:path]))
-      rescue Errno::EPERM
-        return
-      end
+      paths = safe_glob(target[:path])
       return if paths.empty?
 
-      size = paths.sum { |path| get_size(path, sudo) }
-      return if size.zero?
+      deletion_candidates = []
+      total_size = 0
 
-      puts "  - #{target[:name]}: #{format_bytes(size)}"
-      @total_size_cleaned += size
+      paths.each do |path|
+        next unless File.exist?(path)
+
+        size = get_size(path, sudo)
+        next if size.zero?
+
+        total_size += size
+        deletion_candidates << path
+      end
+
+      return if total_size.zero?
+
+      puts "  - #{target[:name]}: #{format_bytes(total_size)}"
+      @total_size_cleaned += total_size
 
       return if @dry_run
 
-      paths.each do |path|
+      deletion_candidates.each do |path|
         if sudo
           system("sudo", "rm", "-rf", path)
         else
           FileUtils.rm_rf(path, verbose: false)
         end
+      end
+    rescue MacCleaner::TooManyOpenFilesError
+      puts "  - #{target[:name]}: skipped (too many files to scan)"
+    rescue Errno::EPERM, Errno::EACCES
+      # Skip paths we cannot access
+    end
+
+    def interactive_section_selection(sections)
+      puts "\nInteractive mode enabled. Review each section before cleaning."
+      sections.each_with_object([]) do |section, selected|
+        label = section[:sudo] ? "#{section[:name]} (requires sudo)" : section[:name]
+        puts "\n#{label}"
+        section[:targets].each do |target|
+          puts "  - #{target[:name]}"
+        end
+        if confirm_selection?(section[:name])
+          selected << section
+        else
+          puts "  Skipping '#{section[:name]}'"
+        end
+      end
+    end
+
+    def confirm_selection?(name)
+      print "Proceed with '#{name}'? [y/N]: "
+      $stdout.flush
+      response = @input.gets
+      return false unless response
+
+      case response.strip.downcase
+      when "y", "yes"
+        true
+      else
+        false
       end
     end
 
@@ -72,6 +127,62 @@ module MacCleaner
       i = (Math.log(bytes) / Math.log(1024)).floor
       "%.2f%s" % [bytes.to_f / 1024**i, units[i]]
     end
+
+    def safe_glob(pattern)
+      expanded = File.expand_path(pattern)
+      return [] unless File.exist?(expanded) || wildcard_pattern?(expanded)
+
+      segments = expanded.split(File::SEPARATOR)
+
+      current_paths =
+        if expanded.start_with?(File::SEPARATOR)
+          segments.shift
+          [File::SEPARATOR]
+        else
+          [segments.shift || expanded]
+        end
+
+      segments.reject!(&:empty?)
+      return current_paths if segments.empty? && File.exist?(expanded)
+
+      segments.each do |segment|
+        current_paths = current_paths.each_with_object([]) do |base, acc|
+          next unless base
+          next unless File.exist?(base)
+
+          if wildcard_pattern?(segment)
+            next unless File.directory?(base)
+
+            begin
+              Dir.each_child(base) do |entry|
+                next if entry == "." || entry == ".."
+                next unless File.fnmatch?(segment, entry, GLOB_FLAGS)
+                acc << File.join(base, entry)
+              end
+            rescue Errno::EMFILE
+              raise MacCleaner::TooManyOpenFilesError
+            rescue Errno::ENOENT, Errno::EACCES, Errno::EPERM
+              next
+            end
+          else
+            candidate = File.join(base, segment)
+            acc << candidate if File.exist?(candidate)
+          end
+        end
+
+        return [] if current_paths.empty?
+      end
+
+      current_paths.map { |path| File.expand_path(path) }.uniq.sort
+    end
+
+    def wildcard_pattern?(segment)
+      segment.match?(WILDCARD_PATTERN)
+    end
+
+    GLOB_FLAGS = File::FNM_EXTGLOB | File::FNM_DOTMATCH
+    WILDCARD_PATTERN = /[*?\[\]{}]/.freeze
+    private_constant :GLOB_FLAGS, :WILDCARD_PATTERN
 
     CLEANUP_SECTIONS = [
       {

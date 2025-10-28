@@ -19,17 +19,13 @@ Gem::Specification.new do |spec|
   spec.metadata["source_code_uri"] = spec.homepage
   spec.metadata["changelog_uri"] = "#{spec.homepage}/blob/main/CHANGELOG.md"
 
-  # Specify which files should be added to the gem when it is released.
-  # The `git ls-files -z` loads the files in the RubyGem that have been added into git.
-  spec.files = Dir.chdir(File.expand_path("..", __FILE__)) do
-    `git ls-files -z`.split("\x0").reject do |f|
-      (f == File.basename(__FILE__)) ||
-        f.end_with?(".gem") ||
-        f.match(%r{\A(?:(?:test|spec|features)/|\.(?:git|travis|circleci)|appveyor)\z})
-    end
-  end
-  spec.bindir        = "bin"
-  spec.executables   = spec.files.grep(%r{\Abin/}) { |f| File.basename(f) }
+  globbed_files = Dir.glob("{exe,lib}/**/*", File::FNM_DOTMATCH)
+                     .reject { |path| File.directory?(path) }
+  static_files = %w[README.md].select { |path| File.exist?(path) }
+  spec.files = (globbed_files + static_files).sort
+
+  spec.bindir        = "exe"
+  spec.executables   = spec.files.grep(%r{\Aexe/}) { |f| File.basename(f) }
   spec.require_paths = ["lib"]
 
   spec.add_dependency "thor"

@@ -17,7 +17,7 @@ gem install mac_cleaner
 ### From the `.gem` file
 
 ```bash
-gem install ./mac_cleaner-1.0.0.gem
+gem install ./mac_cleaner-1.2.0.gem
 ```
 
 ### From the git repository
@@ -40,6 +40,7 @@ mac_cleaner clean
 
 *   `--dry-run`, `-n`: Perform a dry run without deleting files.
 *   `--sudo`: Run with sudo for system-level cleanup.
+*   `--interactive`, `-i`: Review each section and choose what to clean before anything runs.
 
 ### Analyze disk space
 

@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    mac_cleaner (1.0.0)
+    mac_cleaner (1.2.0)
       thor
 
 GEM
