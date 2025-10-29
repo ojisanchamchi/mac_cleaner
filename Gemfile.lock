@@ -2,7 +2,7 @@ PATH
   remote: .
   specs:
     mac_cleaner (1.2.1)
-      thor
+      thor (~> 1.0)
 
 GEM
   remote: https://rubygems.org/
