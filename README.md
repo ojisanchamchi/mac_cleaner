@@ -17,7 +17,7 @@ gem install mac_cleaner
 ### From the `.gem` file
 
 ```bash
-gem install ./mac_cleaner-1.2.1.gem
+gem install ./mac_cleaner-1.2.2.gem
 ```
 
 ### From the git repository
